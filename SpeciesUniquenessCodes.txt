@@ -1,0 +1,62 @@
+setwd("C:\\Users\\JL\\Desktop\\Dernoman\\NewUniquenessMeasure") # Specify your working directory.
+data<-read.table("FW15.txt", header=F) # Name of the file containing your food web data. Format is of edge list, for example, A B 3, means A is consumed by B with weight equal to 3.
+numstep<-3 # Number of steps used to construct the interaction structure of the food web. 
+
+nodeID<-levels(factor(c(as.character(data[,1]),as.character(data[,2]))))
+numnode<-length(nodeID)
+mx<-matrix(rep(0,numnode^2),nrow=numnode,ncol=numnode)
+rownames(mx)<-nodeID
+colnames(mx)<-nodeID
+for (i in 1:length(data[,1])){
+  mx[as.character(data[i,1]),as.character(data[i,2])]<-1  # For binary food web.
+  mx[as.character(data[i,2]),as.character(data[i,1])]<-1
+  # mx[as.character(data[i,1]),as.character(data[i,2])]<-mx[as.character(data[i,1]),as.character(data[i,2])]+as.numeric(data[i,3]) # For weighted food web.
+  # mx[as.character(data[i,2]),as.character(data[i,1])]<-mx[as.character(data[i,2]),as.character(data[i,1])]+as.numeric(data[i,3])
+}
+for (i in 1:numnode) mx[i,i]<-0 # Ignore self-loops.
+
+######################### Interaction matrix-based uniqueness indices.
+TI<-mx
+for (i in 1:numnode){
+  for (j in 1:numnode) TI[j,i]<-mx[j,i]/sum(mx[,i])
+}
+SI<-matrix(rep(0,numnode^2),nrow=numnode,ncol=numnode)
+CI<-diag(numnode)
+for (i in 1:numstep){
+  CI<-CI%*%TI
+  SI<-SI+CI
+}
+
+IntS<-SI/numstep # Matrix of interaction structure.
+dist_IntS<-as.matrix(dist(IntS)) # Matrix of Euclidean distance.
+Uq_Eucl<-apply(dist_IntS,1,sum) # Euclidean distance-based uniqueness index.
+names(Uq_Eucl)<-nodeID
+
+IntS<-SI/numstep # Matrix of interaction structure.
+di<-matrix(rep(0,numnode^2),nrow=numnode,ncol=numnode)
+for (i in 1:numnode) for (j in 1:numnode) di[i,j]<-sum(abs(IntS[i,]-IntS[j,])) # Matrix of Manhattan distance.
+Uq_Manh<-apply(di,2,sum) # Manhattan distance-based uniqueness index.
+names(Uq_Manh)<-nodeID
+#########################
+
+############ TEFO-based uniqueness index.
+ET<-seq(0,1,0.00001) # Range of T from 0 to 1, with increment t=0.00001. Users can change the value of t to get better resoluion.
+for (k in 1:length(ET))
+{
+  Intor<-SI/numstep
+  Intor<-ifelse(Intor>=ET[k],1,0)
+  TO<-numeric(numnode)
+  for (i in 1:numnode){
+    TO[i]<-0
+    for (j in 1:numnode) if (i!=j){
+      TO[i]<-TO[i]+sum(Intor[i,]==Intor[j,])
+    }
+  }
+  if (k==1) {dumMx<-matrix(c(TO),nrow=1)} else{dumMx<-rbind(dumMx,c(TO))}
+}
+
+STO<-apply(dumMx,2,sum) # STO is a vector containing TEFO-based uniqueness values.
+names(STO)<-nodeID
+#############
+
+# Please type Uq_Eucl, Uq_Manh, STO to access those uniqueness values.
